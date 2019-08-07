@@ -1,0 +1,466 @@
+---
+title: "Monticola Modelling"
+author: "Poppy Collins"
+date: "29 July 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+chooseCRANmirror(graphics=FALSE, ind=1)
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE)
+```
+
+# Cimate Data
+
+## Packages
+The following packages are needed to download and manipulate the data that will be acquired: rgdal & raster.
+```{r Install packages, eval=FALSE, include=FALSE}
+if(!require(rgdal)){install.packages("rgdal", repos = "http://cran.us.r-project.org", lib="C:/Users/Poppy/Documents/R/win-library/3.5")}
+if(!require(rgdal)){install.packages("raster", repos = "http://cran.us.r-project.org", "C:/Users/Poppy/Documents/R/win-library/3.5")}
+```
+
+Load packages...
+```{r Load packages, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+library("rgdal", lib.loc="C:/Users/Poppy/Documents/R/win-library/3.5")
+library("raster", lib.loc="C:/Users/Poppy/Documents/R/win-library/3.5")
+```
+
+## UK Extent
+The data downloaded from [WorldClim] (WWW.Worldclim.org) covers the whole surface of the planet. For the MaxEnt Models only the data for the UK is needed and thus the future files will need cropping. The following code creates a frame by which to crop the data.
+
+```{r UK area, echo=FALSE}
+UK <- getData("GADM", country = "GBR", level = 0)
+UK.area <- extent(UK)
+```
+
+## WorldClim
+
+Version 1.4 Data
+
+### Current
+The only version with both current and future data is the older version 1.4. This does not include solar radiation, wind speed or water vapor pressure. However, there is data for multiple different future climate modules under different scenarios.
+
+File names follow the format of Variable,version,resolution.
+
+```{r V1.4 getData current res 2.5, echo=FALSE}
+tmin.1.4.2.5 <- getData('worldclim', var='tmin', res=2.5)
+tmax.1.4.2.5 <- getData('worldclim', var='tmax', res=2.5)
+tavg.1.4.2.5 <- getData('worldclim', var='tmean', res=2.5)
+prec.1.4.2.5 <- getData('worldclim', var='prec', res=2.5)
+bio.1.4.2.5 <- getData('worldclim', var='bio', res=2.5)
+alt.1.4.2.5 <- getData('worldclim', var='alt', res=2.5)
+
+plot(alt.1.4.2.5)
+```
+
+####Crop the data to the UK's extent.
+The _ indicates that the file has been cropped to the UK.
+```{r V1.4 crop current res 2.5, echo=FALSE}
+tmin_1.4_2.5 <- crop(tmin.1.4.2.5, UK.area)
+tmax_1.4_2.5 <- crop(tmin.1.4.2.5, UK.area)
+tavg_1.4_2.5 <- crop(tavg.1.4.2.5, UK.area)
+prec_1.4_2.5 <- crop(prec.1.4.2.5, UK.area)
+bio_1.4_2.5 <- crop(bio.1.4.2.5, UK.area)
+alt_1.4_2.5 <- crop(alt.1.4.2.5, UK.area)
+plot(alt_1.4_2.5)
+```
+
+####Name the months for ease of reviewing later.
+```{r naming the months 1.4}
+month <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+names(tmin_1.4_2.5) <- month
+names(tmax_1.4_2.5) <- month
+names(tavg_1.4_2.5) <- month
+names(prec_1.4_2.5) <- month
+```
+
+
+####The Bioclimatic variables are as follows:
+|  Bio Number |     Asc Name     | Variable                                              |
+|:----------: | :--------------: | :---------------------------------------------------- |
+|   BIO1      | Yrtavg           | Annual Mean Temperature                               |
+|   BIO2      | DiRang           | Diurnal Range (Mean of monthly (max temp - min temp)) |
+|   BIO3      | Isotherm         | Isothermality (BIO2/BIO7) (* 100)                     |
+|   BIO4      | Seast            | Temperature Seasonality (standard deviation *100)     |
+|   BIO5      | WMtmax           | Max Temperature of Warmest Month                      |
+|   BIO6      | CMtmin           |  Min Temperature of Coldest Month                     |
+|   BIO7      | YrRangt          | Temperature Annual Range (BIO5-BIO6)                  |
+|   BIO8      | WeQtavg          | Mean Temperature of Wettest Quarter                   |
+|   BIO9      | DrQtavg          | Mean Temperature of Driest Quarter                    |
+|   BIO10     | WaQtavg          | Mean Temperature of Warmest Quarter                   |
+|   BIO11     | CoQtavg          | Mean Temperature of Coldest Quarter                   |
+|   BIO12     | Yrprec           | Annual Precipitation                                  |
+|   BIO13     | WeMprec          | Precipitation of Wettest Month                        |
+|   BIO14     | DrMprec          | Precipitation of Driest Month                         |
+|   BIO15     | Seasprec         | Precipitation Seasonality (Coefficient of Variation)  |
+|   BIO16     | WeQprec          | Precipitation of Wettest Quarter                      |
+|   BIO17     | DrQprec          | Precipitation of Driest Quarter                       |
+|   BIO18     | WaQprec          | Precipitation of Warmest Quarter                      |
+|   BIO19     | CoQprec          | Precipitation of Coldest Quarter
+
+
+####Save the files an approriate directory.
+
+```{r tmin -> asc 1.4 2.5m, echo=FALSE}
+setwd("C:/Users/Poppy/Documents/Brookes Uni/Conservation Ecology MSC/Project/Data/WorldClim/Version_1.4/Current/2.5m/tmin")
+
+
+writeRaster(tmin_1.4_2.5$Jan, filename="tmin_1.4_2.5_Jan.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmin_1.4_2.5$Feb, filename="tmin_1.4_2.5_Feb.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmin_1.4_2.5$Mar, filename="tmin_1.4_2.5_Mar.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmin_1.4_2.5$Apr, filename="tmin_1.4_2.5_Apr.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmin_1.4_2.5$May, filename="tmin_1.4_2.5_May.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmin_1.4_2.5$Jun, filename="tmin_1.4_2.5_Jun.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmin_1.4_2.5$Jul, filename="tmin_1.4_2.5_Jul.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmin_1.4_2.5$Aug, filename="tmin_1.4_2.5_Aug.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmin_1.4_2.5$Sep, filename="tmin_1.4_2.5_Sep.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmin_1.4_2.5$Oct, filename="tmin_1.4_2.5_Oct.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmin_1.4_2.5$Nov, filename="tmin_1.4_2.5_Nov.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmin_1.4_2.5$Dec, filename="tmin_1.4_2.5_Dec.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+```
+
+```{r tmax -> asc 1.4 2.5m, echo=FALSE}
+setwd("C:/Users/Poppy/Documents/Brookes Uni/Conservation Ecology MSC/Project/Data/WorldClim/Version_1.4/Current/2.5m/tmax")
+
+writeRaster(tmax_1.4_2.5$Jan, filename="tmax_1.4_2.5_Jan.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmax_1.4_2.5$Feb, filename="tmax_1.4_2.5_Feb.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmax_1.4_2.5$Mar, filename="tmax_1.4_2.5_Mar.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmax_1.4_2.5$Apr, filename="tmax_1.4_2.5_Apr.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmax_1.4_2.5$May, filename="tmax_1.4_2.5_May.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmax_1.4_2.5$Jun, filename="tmax_1.4_2.5_Jun.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmax_1.4_2.5$Jul, filename="tmax_1.4_2.5_Jul.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmax_1.4_2.5$Aug, filename="tmax_1.4_2.5_Aug.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmax_1.4_2.5$Sep, filename="tmax_1.4_2.5_Sep.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmax_1.4_2.5$Oct, filename="tmax_1.4_2.5_Oct.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmax_1.4_2.5$Nov, filename="tmax_1.4_2.5_Nov.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tmax_1.4_2.5$Dec, filename="tmax_1.4_2.5_Dec.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+```
+
+```{r tavg -> asc 1.4 2.5m, echo=FALSE}
+#tavg
+setwd("C:/Users/Poppy/Documents/Brookes Uni/Conservation Ecology MSC/Project/Data/WorldClim/Version_1.4/Current/2.5m/tavg")
+
+writeRaster(tavg_1.4_2.5$Jan, filename="tavg_1.4_2.5_Jan.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tavg_1.4_2.5$Feb, filename="tavg_1.4_2.5_Feb.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tavg_1.4_2.5$Mar, filename="tavg_1.4_2.5_Mar.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tavg_1.4_2.5$Apr, filename="tavg_1.4_2.5_Apr.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tavg_1.4_2.5$May, filename="tavg_1.4_2.5_May.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tavg_1.4_2.5$Jun, filename="tavg_1.4_2.5_Jun.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tavg_1.4_2.5$Jul, filename="tavg_1.4_2.5_Jul.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tavg_1.4_2.5$Aug, filename="tavg_1.4_2.5_Aug.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tavg_1.4_2.5$Sep, filename="tavg_1.4_2.5_Sep.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tavg_1.4_2.5$Oct, filename="tavg_1.4_2.5_Oct.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tavg_1.4_2.5$Nov, filename="tavg_1.4_2.5_Nov.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(tavg_1.4_2.5$Dec, filename="tavg_1.4_2.5_Dec.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+```
+
+```{r prec -> asc 1.4 2.5m, echo=FALSE}
+#prec
+setwd("C:/Users/Poppy/Documents/Brookes Uni/Conservation Ecology MSC/Project/Data/WorldClim/Version_1.4/Current/2.5m/prec")
+
+writeRaster(prec_1.4_2.5$Jan, filename="prec_1.4_2.5_Jan.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(prec_1.4_2.5$Feb, filename="prec_1.4_2.5_Feb.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(prec_1.4_2.5$Mar, filename="prec_1.4_2.5_Mar.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(prec_1.4_2.5$Apr, filename="prec_1.4_2.5_Apr.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(prec_1.4_2.5$May, filename="prec_1.4_2.5_May.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(prec_1.4_2.5$Jun, filename="prec_1.4_2.5_Jun.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(prec_1.4_2.5$Jul, filename="prec_1.4_2.5_Jul.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(prec_1.4_2.5$Aug, filename="prec_1.4_2.5_Aug.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(prec_1.4_2.5$Sep, filename="prec_1.4_2.5_Sep.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(prec_1.4_2.5$Oct, filename="prec_1.4_2.5_Oct.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(prec_1.4_2.5$Nov, filename="prec_1.4_2.5_Nov.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(prec_1.4_2.5$Dec, filename="prec_1.4_2.5_Dec.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+```
+
+```{r bio -> asc 1.4 2.5m, echo=FALSE}
+setwd("C:/Users/Poppy/Documents/Brookes Uni/Conservation Ecology MSC/Project/Data/WorldClim/Version_1.4/Current/2.5m/bio")
+writeRaster(bio_1.4_2.5$bio1, filename="bio_1.4_2.5_Yrtavg.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio2, filename="bio_1.4_2.5_DiRang.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio3, filename="bio_1.4_2.5_Isotherm.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio4, filename="bio_1.4_2.5_Seast.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio5, filename="bio_1.4_2.5_WMtmax.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio6, filename="bio_1.4_2.5_CMtmin.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio7, filename="bio_1.4_2.5_YrRangt.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio8, filename="bio_1.4_2.5_WeQtavg.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio9, filename="bio_1.4_2.5_DrQtavg.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio10, filename="bio_1.4_2.5_WaQtavg.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio11, filename="bio_1.4_2.5_CoQtavg.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio12, filename="bio_1.4_2.5_Yrprec.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio13, filename="bio_1.4_2.5_WeMprec.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio14, filename="bio_1.4_2.5_DrMprec.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio15, filename="bio_1.4_2.5_Seasprec.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio16, filename="bio_1.4_2.5_WeQprec.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio17, filename="bio_1.4_2.5_DrQprec.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio18, filename="bio_1.4_2.5_WaQprec.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(bio_1.4_2.5$bio19, filename="bio_1.4_2.5_CoQprec.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+```
+
+```{r alt -> asc 1.4 2.5m, echo=FALSE}
+setwd("C:/Users/Poppy/Documents/Brookes Uni/Conservation Ecology MSC/Project/Data/WorldClim/Version_1.4/Current/2.5m/alt")
+writeRaster(alt_1.4_2.5, filename="alt_1.4_2.5.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+```
+
+## Corine Landuse Data
+https://land.copernicus.eu/pan-european/corine-land-cover/clc-2000
+
+## Vegetation 
+https://lpdaac.usgs.gov/products/mod13a3v006/
+
+# Monticola Data
+
+## Packages
+Install...
+```{r Install Packages, eval=FALSE, include=FALSE}
+install.packages("tibble")
+install.packages("dplyr")
+install.packages("janitor")
+install.packages("rnrfa")
+install.packages("stringr")
+
+```
+Load...
+```{r Load Packages, include=FALSE, echo=FALSE}
+library(tibble)
+library(dplyr)
+library(janitor)
+library(rnrfa)
+library(stringr)
+```
+
+## BWARS Data
+
+BWARS data was received on the 20.07.2019 from Mike Edwards. 
+
+
+```{r Bwars Data Cleaning, echo=FALSE}
+setwd("C:/Users/Poppy/Documents/Brookes Uni/Conservation Ecology MSC/Project/Data/Monticola_Records")
+
+#load BWARS Data
+OG_BWARS <- read.csv("C:/Users/Poppy/Documents/Brookes Uni/Conservation Ecology MSC/Project/Data/Monticola_Records/20190720_Bombus_monticola.csv")
+
+#remove BWARS ID mondern concept column
+ED_BWARS <- OG_BWARS[,-1]
+
+#add column for database origin ID, in this case labled "BWARS"
+ED_BWARS <- add_column(ED_BWARS, "BWARS", .before = 1)
+
+#Rename coloumns to conform
+names(ED_BWARS) <- c("Data_origin", "GridRef", "Date")
+
+#Make sure Gridrefs are in captital letters
+ED_BWARS$GridRef = gsub(" ", " ", ED_BWARS$GridRef, fixed=T)
+ED_BWARS$GridRef <- toupper(ED_BWARS$GridRef)
+```
+
+```{r Create uncertainty BWARS}
+#check it is a character
+str(ED_BWARS)
+ED_BWARS$GridRef <- as.character(ED_BWARS$GridRef)
+
+#Remove incomplete or Irish Grid refrences by removing odd numbers
+ED_BWARS  <- subset(ED_BWARS,!nchar(ED_BWARS$GridRef) == 3 &
+                             !nchar(ED_BWARS$GridRef) == 5 & 
+                             !nchar(ED_BWARS$GridRef) == 7 &
+                             !nchar(ED_BWARS$GridRef) == 9)
+
+# Generate uncertainty values from length of Gridref
+ED_BWARS$Uncertainty <- nchar(ED_BWARS$GridRef)
+ED_BWARS$Uncertainty[ED_BWARS$Uncertainty %in% "12"] <- "1"
+ED_BWARS$Uncertainty[ED_BWARS$Uncertainty %in% "10"] <- "10"
+ED_BWARS$Uncertainty[ED_BWARS$Uncertainty %in% "8"] <- "100"
+ED_BWARS$Uncertainty[ED_BWARS$Uncertainty %in% "6"] <- "1000"
+ED_BWARS$Uncertainty[ED_BWARS$Uncertainty %in% "4"] <- "10000"
+```
+### BWARS 100m 
+```{r BWARS 100m}
+BWARS_1 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 1)
+BWARS_1$Grid <- str_sub(BWARS_1$GridRef, start = 1L, end = 5L)
+BWARS_1$Ref <- str_sub(BWARS_1$GridRef, start = 8L, end = 10L)
+BWARS_1$GridRef <- paste(BWARS_1$Grid,BWARS_1$Ref, sep = "")
+BWARS_1 <- BWARS_1[,-c(5,6)]
+
+BWARS_10 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 10)
+BWARS_10$Grid <- str_sub(BWARS_10$GridRef, start = 1L, end = 5L)
+BWARS_10$Ref <- str_sub(BWARS_10$GridRef, start = 7L, end = 9L)
+BWARS_10$GridRef <- paste(BWARS_10$Grid,BWARS_10$Ref, sep = "")
+BWARS_10 <- BWARS_10[,-c(5,6)]
+
+BWARS_100 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 100)
+
+BWARS_100m <- rbind(BWARS_1,BWARS_10,BWARS_100)
+BWARS_100m <- BWARS_100m[,-4]
+
+Lat.Long <- osg_parse(BWARS_100m$GridRef, coord_system = "WGS84")
+BWARS_100m$Latitude <- Lat.Long$lat
+BWARS_100m$Longitude <- Lat.Long$lon
+```
+
+### BWARS 1000m
+```{r BWARS 1000m}
+BWARS_1 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 1)
+BWARS_1$Grid <- str_sub(BWARS_1$GridRef, start = 1L, end = 4L)
+BWARS_1$Ref <- str_sub(BWARS_1$GridRef, start = 8L, end = 9)
+BWARS_1$GridRef <- paste(BWARS_1$Grid,BWARS_1$Ref, sep = "")
+BWARS_1 <- BWARS_1[,-c(5,6)]
+
+BWARS_10 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 10)
+BWARS_10$Grid <- str_sub(BWARS_10$GridRef, start = 1L, end = 4L)
+BWARS_10$Ref <- str_sub(BWARS_10$GridRef, start = 7L, end = 8L)
+BWARS_10$GridRef <- paste(BWARS_10$Grid,BWARS_10$Ref, sep = "")
+BWARS_10 <- BWARS_10[,-c(5,6)]
+
+BWARS_100 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 100)
+BWARS_100$Grid <- str_sub(BWARS_100$GridRef, start = 1L, end = 4L)
+BWARS_100$Ref <- str_sub(BWARS_100$GridRef, start = 6L, end = 7L)
+BWARS_100$GridRef <- paste(BWARS_100$Grid,BWARS_100$Ref, sep = "")
+BWARS_100 <- BWARS_100[,-c(5,6)]
+
+BWARS_1000 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 1000)
+
+BWARS_1km <- rbind(BWARS_1,BWARS_10,BWARS_100,BWARS_1000)
+BWARS_1km <- BWARS_1km[,-4]
+
+Lat.Long <- osg_parse(BWARS_1km$GridRef, coord_system = "WGS84")
+BWARS_1km$Latitude <- Lat.Long$lat
+BWARS_1km$Longitude <- Lat.Long$lon
+
+UBWARS_1km <- unique(BWARS_1km)
+```
+
+### 10000m
+```{r BWARS 10000m}
+BWARS_1 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 1)
+BWARS_1$Grid <- str_sub(BWARS_1$GridRef, start = 1L, end = 3L)
+BWARS_1$Ref <- str_sub(BWARS_1$GridRef, start = 8L, end = 8L)
+BWARS_1$GridRef <- paste(BWARS_1$Grid,BWARS_1$Ref, sep = "")
+BWARS_1 <- BWARS_1[,-c(5,6)]
+
+BWARS_10 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 10)
+BWARS_10$Grid <- str_sub(BWARS_10$GridRef, start = 1L, end = 3L)
+BWARS_10$Ref <- str_sub(BWARS_10$GridRef, start = 6L, end = 6L)
+BWARS_10$GridRef <- paste(BWARS_10$Grid,BWARS_10$Ref, sep = "")
+BWARS_10 <- BWARS_10[,-c(5,6)]
+
+BWARS_100 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 100)
+BWARS_100$Grid <- str_sub(BWARS_100$GridRef, start = 1L, end = 3L)
+BWARS_100$Ref <- str_sub(BWARS_100$GridRef, start = 6L, end = 6L)
+BWARS_100$GridRef <- paste(BWARS_100$Grid,BWARS_100$Ref, sep = "")
+BWARS_100 <- BWARS_100[,-c(5,6)]
+
+BWARS_1000 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 1000)
+BWARS_1000$Grid <- str_sub(BWARS_1000$GridRef, start = 1L, end = 3L)
+BWARS_1000$Ref <- str_sub(BWARS_1000$GridRef, start = 6L, end = 6L)
+BWARS_1000$GridRef <- paste(BWARS_1000$Grid,BWARS_1000$Ref, sep = "")
+BWARS_1000 <- BWARS_1000[,-c(5,6)]
+
+BWARS_10000 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 10000)
+
+BWARS_10km <- rbind(BWARS_1,BWARS_10,BWARS_100,BWARS_1000,BWARS_10000)
+BWARS_10km <- BWARS_10km[,-4]
+
+Lat.Long <- osg_parse(BWARS_10km$GridRef, coord_system = "WGS84")
+BWARS_10km$Latitude <- Lat.Long$lat
+BWARS_10km$Longitude <- Lat.Long$lon
+```
+
+## HBRG Data
+
+Highland Biological Recording Group data acquired from the National Biodiversity Network website on 22.07.2019.
+
+```{r HBRG Data Cleaning}
+setwd("C:/Users/Poppy/Documents/Brookes Uni/Conservation Ecology MSC/Project/Data/Monticola_Records")
+
+#load HBRG Data
+OG_HBRG <- read.csv("C:/Users/Poppy/Documents/Brookes Uni/Conservation Ecology MSC/Project/Data/Monticola_Records/HBRG-records-2019-07-22.csv")
+
+#remove empty HBRG columns
+ED_HBRG <- remove_empty(OG_HBRG, which = c("cols"))
+
+#Selects only needed columns (Start date, OSGR, Lat, Long, Coord uncertainty, institute code)
+ED_HBRG <- ED_HBRG %>% select(10,19:22, 37)
+
+#Rename columns to confrom
+names(ED_HBRG) <- c("Date", "GridRef", "Latitude", "Longitude", "Uncertainty", "Data_origin")
+
+#Move columns to conform
+ED_HBRG <- ED_HBRG %>% select(Data_origin, GridRef, Date, Longitude, Latitude, Uncertainty)
+```
+
+### HBRG 1km
+```{r HBRG 1km}
+HBRG_1 <- subset(ED_HBRG, ED_HBRG$Uncertainty == 1)
+HBRG_1$Grid <- str_sub(HBRG_1$GridRef, start = 1L, end = 4L)
+HBRG_1$Ref <- str_sub(HBRG_1$GridRef, start = 8L, end = 9)
+HBRG_1$GridRef <- paste(HBRG_1$Grid, HBRG_1$Ref, sep = "")
+HBRG_1 <- HBRG_1[,-c(7,8)]
+
+HBRG_10 <- subset(ED_HBRG, ED_HBRG$Uncertainty == 10)
+HBRG_10$Grid <- str_sub(HBRG_10$GridRef, start = 1L, end = 4L)
+HBRG_10$Ref <- str_sub(HBRG_10$GridRef, start = 7L, end = 8L)
+HBRG_10$GridRef <- paste(HBRG_10$Grid,HBRG_10$Ref, sep = "")
+HBRG_10 <- HBRG_10[,-c(7,8)]
+
+HBRG_100 <- subset(ED_HBRG, ED_HBRG$Uncertainty == 100)
+HBRG_100$Grid <- str_sub(HBRG_100$GridRef, start = 1L, end = 4L)
+HBRG_100$Ref <- str_sub(HBRG_100$GridRef, start = 6L, end = 7L)
+HBRG_100$GridRef <- paste(HBRG_100$Grid,HBRG_100$Ref, sep = "")
+HBRG_100 <- HBRG_100[,-c(7,8)]
+
+HBRG_1000 <- subset(ED_HBRG, ED_HBRG$Uncertainty == 1000)
+
+HBRG_1km <- rbind(HBRG_1, HBRG_10, HBRG_100, HBRG_1000)
+
+Lat.Long <- osg_parse(HBRG_1km$GridRef, coord_system = "WGS84")
+HBRG_1km$Latitude <- Lat.Long$lat
+HBRG_1km$Longitude <- Lat.Long$lon
+HBRG_1km <- HBRG_1km[,-c(6)]
+
+UHBRG_1km <- unique(HBRG_1km)
+```
+
+
+## Complete Dataset
+```{r Combining}
+Mont_1km <- rbind(UBWARS_1km, UHBRG_1km)
+
+Mont_1km[,3] = as.Date(Mont_1km[,3], format="%Y-%m-%d")
+class(Mont_1km$Date) 
+
+
+#Remove dates beyond the WorldClime Dataset (Pre 1960)
+Mont_MaxEnt <- Mont_1km %>% filter(Mont_1km$Date >= "1960-01-01")
+
+# Add species column
+Mont_MaxEnt <- add_column(Mont_MaxEnt, "Bombus monticola", .before = 1)
+
+#Remove excess columns
+Mont_MaxEnt <- Mont_MaxEnt[,-c(2,3,4)]
+
+#Rename to conform
+names(Mont_MaxEnt) <- c("Species", "lat", "long")
+
+#Extract Unique to remove sampling bias
+Mont_MaxEnt <- unique(Mont_MaxEnt)
+
+#Write .csv
+write.csv(Mont_MaxEnt, file = "Mont_MaxEnt.csv")
+```
+
+### Visualise Data
+```{r visualise Data}
+library(rgdal)
+library(raster)
+library(sp)
+library(leaflet)
+library(maps)
+leaflet(data = Mont_MaxEnt) %>% 
+  addProviderTiles(providers$Esri.NatGeoWorldMap) %>% 
+  addCircleMarkers(~long, ~lat)
+```
+
+
