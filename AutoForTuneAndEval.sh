@@ -4,7 +4,7 @@
 
 mkdir outputs
 mkdir iteration_info
-ENMTOOLS_HOME=ENMTools_1.3
+ENMTOOLS_HOME=ENMTools_1.4.4
 speciesname=Bombus_monticola
 samplesfile=B.monticola.csv # input the name of .csv species occurrence file here. format within this file should typical maxent format #
 fadebyclamping=true 
@@ -62,7 +62,7 @@ envlayer=variables  # folder created which contains all the environmental variab
 	done
 
 # this is to run ENMTOOLS #
-perl $ENMTOOLS_HOME/ENMTools_1.3.pl $models_csv
+perl $ENMTOOLS_HOME/ENMTools_1.4.4.pl $models_csv
 
 # this is to sort important variables
 model_selection_csv=${models_csv%%.csv}_model_selection.csv
