@@ -1,0 +1,1178 @@
+---
+title: "ENM_B.monticola"
+author: "Poppy Collins"
+date: "29 August 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Replace with desired directory
+YOUR_DIRECTORY <- "C:/Users/Poppy/Desktop/B.monticola/ENM"
+setwd(YOUR_DIRECTORY)
+```
+
+# Packages & Themes
+The following packages are required to conduct the data set creation and analysis:
+
+```{r Install packages, message=FALSE, warning=FALSE, results='hide'}
+#To avoid long delays from installing dependancies you may already have use your existing library of packages...
+
+dir.create("Packages")
+.libPaths("Packages") #edit this code to your existing library
+
+if(!require(ggplot2)){install.packages("ggplot2", repos = "http://cran.us.r-project.org", lib="Packages")}
+
+if(!require(devtools)){install.packages("devtools", repos = "http://cran.us.r-project.org", lib="Packages")}
+
+if(!require(stringr)){install.packages("stringr", repos = "http://cran.us.r-project.org", lib="Packages")}
+
+if(!require(rnrfa)){install.packages("rnrfa", repos = "http://cran.us.r-project.org", lib="Packages")}
+
+if(!require(raster)){install.packages("raster", repos = "http://cran.us.r-project.org", lib="Packages")}
+
+if(!require(dplyr)){install.packages("dplyr", repos = "http://cran.us.r-project.org", lib="Packages")}
+
+if(!require(tibble)){install.packages("tibble", repos = "http://cran.us.r-project.org", lib="Packages")}
+
+if(!require(maps)){install.packages("maps", repos = "http://cran.us.r-project.org", lib="Packages")}
+
+if(!require(dismo)){install.packages("dismo", repos = "http://cran.us.r-project.org", lib="Packages")}
+
+if(!require(rgeos)){install.packages("rgeos", repos = "http://cran.us.r-project.org", lib="Packages")}
+
+if(!require(ENMeval)){install.packages("ENMeval", repos = "http://cran.us.r-project.org", lib="Packages")}
+
+if(!require(RColorBrewer)){install.packages("RColorBrewer", repos = "http://cran.us.r-project.org", lib="Packages")}
+
+devtools::install_github("kapitzas/WorldClimTiles")
+
+devtools::install_github("SEEG-Oxford/seegSDM")
+
+```
+
+```{r Plot themes}
+#cbp <- c(orange,blue, black)
+newc <- c("#FF7F00","#1F78B4", "#000000")
+
+
+tempcol <- colorRampPalette(c("#4575b4", "#74add1", "#abd9e9", "#e0f3f8", "#ffffbf", "#fee090", "#fdae61", "#f46d43", "#d73027"))
+probcol <- colorRampPalette(c("#f0f0f0", "#fed976", "#feb24c", "#fd8d3c",  "#fc4e2a", "#e31a1c", "#b10026" ))
+
+Curcol <- colorRampPalette(c('#f0f0f0', "#000000"))
+CC26col <- colorRampPalette(c('#f0f0f0', "#74add1"))
+CC85col <- colorRampPalette(c('#f0f0f0', "#4575b4"))
+MC26col <- colorRampPalette(c('#f0f0f0', "#f46d43"))
+MC85col <- colorRampPalette(c('#f0f0f0', "#d73027"))
+```
+
+
+
+# Climate Data
+
+The climates data used in this study was acquired from [WorldClim] (WWW.Worldclim.org), version 1.4 was used due to the availability of future predictions. The resolution used for this study was 30 secounds (0.5) which equates to approximately pixels of approximately 1km.
+
+## UK Extent
+The data downloaded from [WorldClim] (WWW.Worldclim.org) covers the whole surface of the planet. For the MaxEnt Models only the data for the UK is needed and thus the future files will need cropping. The following code creates an extent raster by which to crop the data.
+
+For downloading he 30sec resolution data it is required to download the data by tiles. The tiled data comes in 30 x 30 degree tiles, each consisting of 3600 rows and 3600 columns. To easily download the tiles for the UK the package [WorldClimTiles] (https://github.com/kapitzas/WorldClimTiles) was used. 
+
+The variables which will be used are the bioclimatic variables, Maximum monthly temperature, minimum monthly temperature, mean monthly temperature and precipitation levels. These values are the predicted values rather than recorded values.
+
+The same code is used to download, crop and save each variable.
+
+```{r UK area, message=FALSE, warning=FALSE}
+# Get a spatial polygon for the UK
+UK <- getData("GADM", country = "GBR", level = 0)
+#Create an extent raster from cropping
+UK.area <- extent(UK)
+
+# This package streamlines the process for downloading data from Worldclim at the 0.5 resolution.
+library("WorldClimTiles")
+tilenames <- tile_name(UK) #Gets the numbers of the tiles needed to cover the UK
+```
+
+## Bioclimatic Variables
+Bioclimatic variables are derived from the monthly temperature and rainfall values to generate biologically meaningful variables which represent annual trends, seasonality and extreme or limiting environmental factors.
+
+They are coded as followed:
+
+File | Variable
+:--- | ---------
+Bio1 | Annual Mean Temperature
+BIO2 | Mean Diurnal Range (Mean of monthly (max temp - min temp))
+BIO3 | Isothermality (BIO2/BIO7) (* 100)
+BIO4 | Temperature Seasonality (standard deviation *100)
+BIO5 | Max Temperature of Warmest Month
+BIO6 | Min Temperature of Coldest Month
+BIO7 | Temperature Annual Range (BIO5-BIO6)
+BIO8 | Mean Temperature of Wettest Quarter
+BIO9 | Mean Temperature of Driest Quarter
+BIO10 | Mean Temperature of Warmest Quarter
+BIO11 | Mean Temperature of Coldest Quarter
+BIO12 | Annual Precipitation
+BIO13 | Precipitation of Wettest Month
+BIO14 | Precipitation of Driest Month
+BIO15 | Precipitation Seasonality (Coefficient of Variation)
+BIO16 | Precipitation of Wettest Quarter
+BIO17 | Precipitation of Driest Quarter
+BIO18 | Precipitation of Warmest Quarter
+BIO19 | Precipitation of Coldest Quarter
+
+```{r bio, eval=FALSE, warning=FALSE}
+# Download the bio data for the tiles specified by tile_name in the above code
+bio.tiles <- tile_get(tilenames, "bio") 
+#Merge the downloaded tiles so there is one raster for the whole UK
+bio <- tile_merge(bio.tiles)
+# Crop the data to the UK
+UK.bio <- crop(bio, UK.area)
+
+#Create a folder to place the variables within
+dir.create("variables")
+
+# Extract each month (numbered 1-12) and save as an individual file.
+writeRaster(UK.bio$bio1, filename="variables/bio1.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio2, filename="variables/bio2.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio3, filename="variables/bio3.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio4, filename="variables/bio4.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio5, filename="variables/bio5.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio6, filename="variables/bio6.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio7, filename="variables/bio7.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio8, filename="variables/bio8.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio9, filename="variables/bio9.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio10, filename="variables/bio10.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio11, filename="variables/bio11.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio12, filename="variables/bio12.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio13, filename="variables/bio13.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio14, filename="variables/bio14.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio15, filename="variables/bio15.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio16, filename="variables/bio16.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio17, filename="variables/bio17.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio18, filename="variables/bio18.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.bio$bio19, filename="variables/bio19.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+```
+
+## Minimum Temperature
+Tmin values are the predicted monthly minimum temperature
+```{r tmin, eval=FALSE}
+tmin.tiles <- tile_get(tilenames, "tmin")
+tmin <- tile_merge(tmin.tiles)
+UK.tmin <- crop(tmin, UK.area)
+
+writeRaster(UK.tmin$tmin1, filename="variables/tmin1.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmin$tmin2, filename="variables/tmin2.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmin$tmin3, filename="variables/tmin3.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmin$tmin4, filename="variables/tmin4.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmin$tmin5, filename="variables/tmin5.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmin$tmin6, filename="variables/tmin6.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmin$tmin7, filename="variables/tmin7.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmin$tmin8, filename="variables/tmin8.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmin$tmin9, filename="variables/tmin9.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmin$tmin10, filename="variables/tmin10.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmin$tmin11, filename="variables/tmin11.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmin$tmin12, filename="variables/tmin12.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+```
+
+## Maximum Temperature
+
+Tmin values are the predicted monthly maximum temperature.
+```{r tmax, eval=FALSE}
+tmax.tiles <- tile_get(tilenames, "tmax")
+tmax <- tile_merge(tmax.tiles)
+UK.tmax <- crop(tmax, UK.area)
+
+writeRaster(UK.tmax$tmax1, filename="variables/tmax1.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmax$tmax2, filename="variables/tmax2.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmax$tmax3, filename="variables/tmax3.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmax$tmax4, filename="variables/tmax4.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmax$tmax5, filename="variables/tmax5.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmax$tmax6, filename="variables/tmax6.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmax$tmax7, filename="variables/tmax7.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmax$tmax8, filename="variables/tmax8.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmax$tmax9, filename="variables/tmax9.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmax$tmax10, filename="variables/tmax10.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmax$tmax11, filename="variables/tmax11.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmax$tmax12, filename="variables/tmax12.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+```
+
+## Mean Temperature
+
+Tmean values are the predicted average monthly temperatures.
+```{r tmean, eval=FALSE}
+tmean.tiles <- tile_get(tilenames, "tmean")
+tmean <- tile_merge(tmean.tiles)
+UK.tmean <- crop(tmean, UK.area)
+
+writeRaster(UK.tmean$tmean1, filename="variables/tmean1.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmean$tmean2, filename="variables/tmean2.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmean$tmean3, filename="variables/tmean3.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmean$tmean4, filename="variables/tmean4.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmean$tmean5, filename="variables/tmean5.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmean$tmean6, filename="variables/tmean6.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmean$tmean7, filename="variables/tmean7.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmean$tmean8, filename="variables/tmean8.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmean$tmean9, filename="variables/tmean9.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmean$tmean10, filename="variables/tmean10.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmean$tmean11, filename="variables/tmean11.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.tmean$tmean12, filename="variables/tmean12.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+```
+
+## Precipitation
+
+Prec values are the predicted average monthly precititation values.
+```{r prec, eval=FALSE}
+prec.tiles <- tile_get(tilenames, "prec")
+prec <- tile_merge(prec.tiles)
+UK.prec <- crop(prec, UK.area)
+
+writeRaster(UK.prec$prec1, filename="variables/prec1.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.prec$prec2, filename="variables/prec2.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.prec$prec3, filename="variables/prec3.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.prec$prec4, filename="variables/prec4.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.prec$prec5, filename="variables/prec5.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.prec$prec6, filename="variables/prec6.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.prec$prec7, filename="variables/prec7.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.prec$prec8, filename="variables/prec8.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.prec$prec9, filename="variables/prec9.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.prec$prec10, filename="variables/prec10.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.prec$prec11, filename="variables/prec11.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(UK.prec$prec12, filename="variables/prec12.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+```
+
+# Occurances
+Occurance data is curtesy of the Bees, Wasps and Ants recording Society and the Highland Biological Recording Group. These groups were chosen due to the checks in place ensuring good quality data.
+Before combining the two datasets the data will be formatted and the latitudinal and longitudinal data extracted.The resolution of the occurance data is to match the variable resolution and thus only records with 1km accuracy or more higher accuracy will be used.
+
+## BWARS Data
+
+Data from BWARS was provided on request from Mike Edwards via private email on the 20Th Jul 2019.
+Data uploaded to repository for replication, do not redistribute. 
+```{r BWARS Data download, warning=FALSE}
+
+dir.create("Occurance_Data")
+
+#Download BWARS Data
+download.file(url = "https://raw.githubusercontent.com/Poppy-Collins/Investigating-Bombus-monticola/master/BWARS_Bombus_monticola.csv", destfile = "Occurance_Data/BWARS_Bombus_monticola.csv", mode = "w", quiet = FALSE)
+BWARS <- read.csv("Occurance_Data/BWARS_Bombus_monticola.csv")
+
+#Remove BWARS ID mondern concept column
+ED_BWARS <- BWARS[,-1]
+
+#Rename coloumns to conform
+names(ED_BWARS) <- c("GridRef", "Date")
+
+#Make sure Gridrefs are in captital letters
+ED_BWARS$GridRef = gsub(" ", " ", ED_BWARS$GridRef, fixed=T)
+ED_BWARS$GridRef <- toupper(ED_BWARS$GridRef)
+
+#set GridRef as character
+ED_BWARS$GridRef <- as.character(ED_BWARS$GridRef)
+
+#Remove incomplete or Irish Grid refrences by removing odd numbers
+ED_BWARS  <- subset(ED_BWARS,!nchar(ED_BWARS$GridRef) == 3 &
+                             !nchar(ED_BWARS$GridRef) == 5 & 
+                             !nchar(ED_BWARS$GridRef) == 7 &
+                             !nchar(ED_BWARS$GridRef) == 9)
+
+#Generate uncertainty values from length of Gridref
+ED_BWARS$Uncertainty <- nchar(ED_BWARS$GridRef)
+ED_BWARS$Uncertainty[ED_BWARS$Uncertainty %in% "12"] <- "1"
+ED_BWARS$Uncertainty[ED_BWARS$Uncertainty %in% "10"] <- "10"
+ED_BWARS$Uncertainty[ED_BWARS$Uncertainty %in% "8"] <- "100"
+ED_BWARS$Uncertainty[ED_BWARS$Uncertainty %in% "6"] <- "1000"
+ED_BWARS$Uncertainty[ED_BWARS$Uncertainty %in% "4"] <- "10000"
+
+#Subset occurrences of 1m accuracy
+BWARS_1 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 1)
+
+#Shorten GridRef to 4 figures (1km accuracy)
+BWARS_1$Grid <- str_sub(BWARS_1$GridRef, start = 1L, end = 4L)
+BWARS_1$Ref <- str_sub(BWARS_1$GridRef, start = 8L, end = 9)
+
+#Combine the two halves of the new gridref
+BWARS_1$GridRef <- paste(BWARS_1$Grid,BWARS_1$Ref, sep = "")
+
+#Remove redundant columns
+BWARS_1 <- BWARS_1[,-c(4,5)]
+
+# Repeat previous steps for those of 10m accuracy
+BWARS_10 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 10)
+BWARS_10$Grid <- str_sub(BWARS_10$GridRef, start = 1L, end = 4L)
+BWARS_10$Ref <- str_sub(BWARS_10$GridRef, start = 7L, end = 8L)
+BWARS_10$GridRef <- paste(BWARS_10$Grid,BWARS_10$Ref, sep = "")
+BWARS_10 <- BWARS_10[,-c(4,5)]
+
+#Repeat previous steps for those of 100m accuracy
+BWARS_100 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 100)
+BWARS_100$Grid <- str_sub(BWARS_100$GridRef, start = 1L, end = 4L)
+BWARS_100$Ref <- str_sub(BWARS_100$GridRef, start = 6L, end = 7L)
+BWARS_100$GridRef <- paste(BWARS_100$Grid,BWARS_100$Ref, sep = "")
+BWARS_100 <- BWARS_100[,-c(4,5)]
+
+#Subset occurances of 1km accuracy
+BWARS_1000 <- subset(ED_BWARS, ED_BWARS$Uncertainty == 1000)
+
+#Combine the newly made 1km accuracy files
+BWARS_1km <- rbind(BWARS_1,BWARS_10,BWARS_100,BWARS_1000)
+BWARS_1km <- BWARS_1km[,-3]
+
+#Generate the lat & long from the gridreferences
+Lat.Long <- osg_parse(BWARS_1km$GridRef, coord_system = "WGS84")
+BWARS_1km$Latitude <- Lat.Long$lat
+BWARS_1km$Longitude <- Lat.Long$lon
+
+#Retain only the unique occurances (remove duplicates)
+UBWARS_1km <- unique(BWARS_1km)
+
+#UBWARS_1km = data from HBRG to 1km accuracy with duplicaets removed
+count(UBWARS_1km)
+```
+
+## HBRG Data
+
+Data from the Highland Biological recording group was downloaded from NBN Atlas on the 22nd Jul 2019.
+```{r HBRG Data download}
+#Download HBRG Data
+download.file(url = "https://raw.githubusercontent.com/Poppy-Collins/Investigating-Bombus-monticola/master/HBRG-records-2019-07-22.csv", destfile = "Occurance_Data/HBRG_Bombus_monticola.csv", mode = "w", quiet = FALSE)
+HBRG <- read.csv("Occurance_Data/HBRG_Bombus_monticola.csv")
+
+
+#Selects only needed columns (Start date, OSGR)
+ED_HBRG <- HBRG %>% select(10,19)
+
+#Rename columns to confrom
+names(ED_HBRG) <- c("Date", "GridRef")
+
+#Move columns to conform
+ED_HBRG <- ED_HBRG %>% dplyr::select(GridRef, Date)
+
+#set GridRef as character
+ED_HBRG$GridRef <- as.character(ED_HBRG$GridRef)
+
+#Remove incomplete or Irish Grid refrences by removing odd numbers
+ED_HBRG  <- subset(ED_HBRG,!nchar(ED_HBRG$GridRef) == 3 &
+                             !nchar(ED_HBRG$GridRef) == 5 & 
+                             !nchar(ED_HBRG$GridRef) == 7 &
+                             !nchar(ED_HBRG$GridRef) == 9)
+
+# Generate uncertainty values from length of Gridref
+ED_HBRG$Uncertainty <- nchar(ED_HBRG$GridRef)
+ED_HBRG$Uncertainty[ED_HBRG$Uncertainty %in% "12"] <- "1"
+ED_HBRG$Uncertainty[ED_HBRG$Uncertainty %in% "10"] <- "10"
+ED_HBRG$Uncertainty[ED_HBRG$Uncertainty %in% "8"] <- "100"
+ED_HBRG$Uncertainty[ED_HBRG$Uncertainty %in% "6"] <- "1000"
+ED_HBRG$Uncertainty[ED_HBRG$Uncertainty %in% "4"] <- "10000"
+
+
+#Subset occurrences of 1m accuracy
+HBRG_1 <- subset(ED_HBRG, ED_HBRG$Uncertainty == 1)
+
+#Shorten GridRef to 4 figures (1km accuracy)
+HBRG_1$Grid <- str_sub(HBRG_1$GridRef, start = 1L, end = 4L)
+HBRG_1$Ref <- str_sub(HBRG_1$GridRef, start = 8L, end = 9)
+
+#Combine the two halves of the new gridref
+HBRG_1$GridRef <- paste(HBRG_1$Grid, HBRG_1$Ref, sep = "")
+
+#Remove redundant columns
+HBRG_1 <- HBRG_1[,-c(4,5)]
+
+#Repeat previous steps for those of 10m accuracy
+HBRG_10 <- subset(ED_HBRG, ED_HBRG$Uncertainty == 10)
+HBRG_10$Grid <- str_sub(HBRG_10$GridRef, start = 1L, end = 4L)
+HBRG_10$Ref <- str_sub(HBRG_10$GridRef, start = 7L, end = 8L)
+HBRG_10$GridRef <- paste(HBRG_10$Grid,HBRG_10$Ref, sep = "")
+HBRG_10 <- HBRG_10[,-c(4,5)]
+
+#Repeat previous steps for those of 100m accuracy
+HBRG_100 <- subset(ED_HBRG, ED_HBRG$Uncertainty == 100)
+HBRG_100$Grid <- str_sub(HBRG_100$GridRef, start = 1L, end = 4L)
+HBRG_100$Ref <- str_sub(HBRG_100$GridRef, start = 6L, end = 7L)
+HBRG_100$GridRef <- paste(HBRG_100$Grid,HBRG_100$Ref, sep = "")
+HBRG_100 <- HBRG_100[,-c(4,5)]
+
+#Subset occurances of 1km accuracy
+HBRG_1000 <- subset(ED_HBRG, ED_HBRG$Uncertainty == 1000)
+
+#Combine the newly made 1km accuracy files
+HBRG_1km <- rbind(HBRG_1, HBRG_10, HBRG_100, HBRG_1000)
+HBRG_1km <- HBRG_1km[,-3]
+
+#Generate the lat & long from the gridreferences
+Lat.Long <- osg_parse(HBRG_1km$GridRef, coord_system = "WGS84")
+HBRG_1km$Latitude <- Lat.Long$lat
+HBRG_1km$Longitude <- Lat.Long$lon
+HBRG_1km <- HBRG_1km[,-c(6)]
+
+#Retain only the unique occurances
+UHBRG_1km <- unique(HBRG_1km)
+
+#UHBRG_1km = data from HBRG to 1km accuracy with duplicaets removed
+count(UHBRG_1km)
+```
+
+
+## Final Dataset Creation
+
+To create the final dataset the combined dataset created from the BWARS and HBRG data will undergo some steps to ensure the resulting dataset is optimized for creating an optimal ecological niche model. This includes:
+* Filtering the occurances by date to as closely match the time frame for the climatic variables as possible while maintaining a high number of data points, 
+* Relocating occurance points which fall outside of the rasters (Offshore),
+* Removing outliers/isolated points.
+
+### Time Frame for Records
+
+The variable data from Worldclim are the predicted average from between 1960 - 1990. Ideally the occurance points should also fall within this timeframe. However, due to the nature of recording species distribution this is difficult to achieve and have a suitable number of datapoints. 
+```{r Time frame analysis, warning=FALSE}
+# Combine the BWARS and HBRG unique data of 1km accuracy
+Mont_1km <- rbind(UBWARS_1km, UHBRG_1km)
+
+# Remove duplicates between datasets
+Mont_1km <- unique(Mont_1km)
+
+# Ensure that the data column is catagorised as a date
+Mont_1km[,2] = as.Date(Mont_1km[,2], format="%Y-%m-%d")
+
+Pre1950 <- Mont_1km %>% filter(Mont_1km$Date < "1950-01-01")
+D1950_60 <- Mont_1km %>% filter(Mont_1km$Date >= "1950-01-01",
+                                Mont_1km$Date < "1960-01-01")
+D1960_70 <- Mont_1km %>% filter(Mont_1km$Date >= "1960-01-01",
+                                Mont_1km$Date < "1970-01-01")                              
+D1970_80 <- Mont_1km %>% filter(Mont_1km$Date >= "1970-01-01",
+                                Mont_1km$Date < "1980-01-01")
+D1980_90 <- Mont_1km %>% filter(Mont_1km$Date >= "1980-01-01",
+                                Mont_1km$Date < "1990-01-01")
+D1990_20 <- Mont_1km %>% filter(Mont_1km$Date >= "1990-01-01",
+                                Mont_1km$Date < "2000-01-01")
+D2000_10 <- Mont_1km %>% filter(Mont_1km$Date >= "2000-01-01",
+                                Mont_1km$Date < "2010-01-01")
+D2010_20 <- Mont_1km %>% filter(Mont_1km$Date >= "2010-01-01",
+                                Mont_1km$Date < "2020-01-01")
+
+Occ_dates <- rbind(count(Pre1950),count(D1950_60),count(D1960_70),count(D1970_80),count(D1980_90),count(D1990_20),count(D2000_10),count(D2010_20))
+Occ_dates$Year <- c("Pre1950","1950s","1960s","1970s","1980s","1990s","2000s","2010s")
+Occ_dates <- Occ_dates[,c(2,1)]
+print(Occ_dates)
+
+barplot(Occ_dates$n, names.arg=Occ_dates$Year, las=2, ylab="Number of Unique Recorded Locations", xlab="Decade", main='Unique Locations Recorder per Decade')
+```
+
+The barchart above suggestes that limiting the data to only 1960-1990 would have far fewer locations than if points outside of this time range were included. As there is a sharp increase in records in the decade post 2000 it is likely that advances in technology, particularly relating to citizen science, that the increased number of unique locations is due to better recording rather than changes in the climate. Thus, the timeframe of 1960 - 2010 will be used for the purpose of this study.
+```{r Timeframe Creation}
+# Combine the BWARS and HBRG unique data of 1km accuracy
+Mont_1km <- rbind(UBWARS_1km, UHBRG_1km)
+
+# Ensure that the data column is catagorised as a date
+Mont_1km[,2] = as.Date(Mont_1km[,2], format="%Y-%m-%d")
+
+#Obtain points inside the desired time frame
+Mont_pos1960 <- Mont_1km %>% filter(Mont_1km$Date >= "1960-01-01")
+Mont_pre2010 <- Mont_pos1960 %>% filter(Mont_pos1960$Date <= "2010-01-01")
+
+#Obtain points outside the desired time frame
+Mont_pre1960 <- Mont_1km %>% filter(Mont_1km$Date <= "1960-01-01")
+Mont_pos2010 <- Mont_1km %>% filter(Mont_1km$Date >= "2010-01-01")
+Mont_OutTF <- rbind(Mont_pos2010,Mont_pre1960)
+
+#remove gridref & date column
+Mont_OutTF <- Mont_OutTF[,-c(1,2)]
+Mont <- Mont_pre2010[,-c(1,2)]
+
+#reorder
+Mont <- Mont[c(2,1)]
+Mont_OutTF <- Mont_OutTF[c(2,1)]
+
+#Mont = data to 1km accuracy after 1960 with duplicates within the databases removed
+count(Mont)
+
+# load a raster to use as a template (in this case the first of the Worldclim rasters: bio1)
+template <- raster("variables/bio1.asc")
+
+# plot of points
+plot(template, xlim=c(-11, 2), ylim=c(48, 59), col='gray', legend=FALSE, main = 'Time Frame Filtering')
+points(Mont_OutTF, pch = 16, col='purple')
+points(Mont, pch = 18)
+```
+The above plot shows the points which will be retained (1960-2010: black) and those which are being discarded (pre 1960 & post 2010: purple)
+
+
+### Relocating Offshore Records
+
+Some records, due to being rounded to the centre of a grid square, are not within the bounds of the variables rasters. To correct these, the package [seegSDM] (https://rdrr.io/github/SEEG-Oxford/seegSDM/) was used, utilising the nearest_Land function.
+```{r move pts that are off the coast}
+# Relocate points which are in the sea
+library(seegSDM)
+
+# find those which fall in NA areas on the template raster
+vals <- extract(template, Mont)
+inside_mask <- !is.na(vals)
+inside_pts <- Mont[inside_mask, ]
+outside_mask <- is.na(vals)
+outside_pts <- Mont[outside_mask, ]
+
+# find the nearest land within decimal degrees of the outside points and move
+land <- nearestLand(outside_pts, template, 5000)
+
+# count how many were moved
+sum(!is.na(land[, 1]))
+
+# and how many were too far out
+sum(is.na(land[, 1]))
+
+# plot of points
+plot(template, xlim=c(-11, 2), ylim=c(48, 59), col='gray', legend=FALSE, main = 'Relocated Offshore Points')
+points(inside_pts, pch = 16) 
+# plot the new points (for those which were reassigned) in cyan
+points(land, pch = 16, col = 'cyan')
+
+```
+
+
+```{r add the moved pts to data}
+
+# convert from matrix to datafram
+moved_pts <- as.data.frame(land)
+
+# rename to conform
+names(moved_pts) <- c("Longitude", "Latitude")
+
+# combine inside pts & relocated outside points
+Mon_no_sea <- rbind(inside_pts,moved_pts)
+
+#remove NA
+Mon_no_sea <- na.omit(Mon_no_sea)
+```
+
+
+
+### Filtering of Outliers
+The removal of marginal and outlying points is important in the creation of transferable and accurate models as points which are not representative of the favored habitat, can skew the results. In these cases, the lack of nearby points suggests that it was an isolated incidence, for example a migrating male, rather than a breeding population, and as such the locations do not meet the species requirements.
+```{r remove outliers}
+
+library(sp)
+library(rgeos)
+
+sp.Mon <- Mon_no_sea
+coordinates(sp.Mon) <- ~Longitude+Latitude
+
+d <- gDistance(sp.Mon, byid=T)
+min.d <- apply(d, 1, function(x) order(x, decreasing=F)[2])
+
+Mon_dist <- cbind(Mon_no_sea, Mon_no_sea[min.d,], apply(d, 1, function(x) sort(x, decreasing=F)[2]))
+colnames(Mon_dist) <- c(colnames(Mon_no_sea), 'n.lat', 'n.long', 'distance')
+
+#Remove points greater than 1 degree from neighbor
+Mon_outl <- subset(Mon_dist, Mon_dist$distance > 1)
+Mon_outl <- Mon_outl[, -c(3:5)]
+Mon_No_outl <- subset(Mon_dist, Mon_dist$distance < 1)
+Mon_No_outl <- Mon_No_outl[, -c(3:5)]
+```
+
+### Sampling Bias
+Not all areas are sampled equally and thus observational species data tends to exhibit sampling bias. It is difficult to compensiate for, however, thinning datapoints in more densely sampled areas can help. As the data in this dataset is rounded to the accuracy of 1km with the date column removed it is possible to thin the data by using the unique function, ensuring there is only one data point per 1km square.
+```{r sampling bias}
+B.mon_pts <- unique(Mon_No_outl)
+```
+
+
+### Final set
+Follwing the above steps the final dataset is complete.
+```{r Final dataset}
+# B.mon = Final Dataset
+count(B.mon_pts)
+
+write.csv(B.mon_pts, file = "Occurrences.csv", row.names=FALSE) #without species column
+```
+
+The following code is to create a plot to explore the process of creating the Final Data set.
+```{r plot dataset creation, eval=FALSE}
+#Plot steps to final data set
+plot(template, xlim=c(-11, 2), ylim=c(48, 59), col='gray', legend=FALSE, main='Dataset Creation')
+points(Mont_OutTF, pch = 16, col='purple') #outside time frame
+points(B.mon_pts, pch = 16) #final set
+points(outside_pts, pch = 18, col= 'cyan') #moved points
+points(Mon_outl, pch = 17, col= 'red') # outliers
+
+
+```
+
+```{r plot of occurances, warning=FALSE}
+Mont_OutTF$Data_type <- "Outside Timeframe"
+outside_pts$Data_type <- "Offshore"
+Mon_outl$Data_type <- "Outlier"
+B.mon_pts$Data_type <- "Final Set"
+
+Occ_pts_plot <- rbind(Mon_outl, Mont_OutTF,B.mon_pts, outside_pts)
+
+temprp <- rasterToPoints(template)
+temp_df <- data.frame(temprp)
+
+Occ_pplot <- ggplot()+
+  geom_tile(data = temp_df, aes(x = x, y = y), fill = '#C0C0C0') +
+  geom_point(data = Occ_pts_plot, 
+             aes(x = Longitude, y = Latitude, col = Data_type))+
+  scale_color_manual(values = c("#000000", "#56B4E9", "#D55E00",  "#F0E442"), name = "State of Occurance") +
+  ylim(50, 59)+
+  theme_void()+
+  theme(axis.title.x = element_blank(), 
+         axis.title.y = element_blank(), 
+         axis.text.x = element_blank(), 
+         axis.text.y = element_blank(), 
+         axis.ticks = element_blank())+
+  coord_quickmap() +
+  theme(legend.position = "left")
+
+Occ_pplot
+```
+
+
+
+
+# Background points
+
+Using background points rather than pseudo-absence
+
+```{r generate background points}
+library(dismo)
+set.seed(1) #to allow to be replicated
+
+# Randomly sample 10,000 background points from one background extent raster (only one per cell without replacement). Note: Since the raster has <10,000 pixels, you'll get a warning and all pixels will be used for background)
+bg_gen <- randomPoints(template, n=10000)
+bg <- as.data.frame(bg_gen)
+
+# Notice how we have pretty good coverage (every cell).
+plot(template[[1]], legend=FALSE)
+points(bg, col='red')
+
+write.csv(bg,file = "background.csv", row.names=FALSE)
+```
+
+# Model Creation
+
+
+## Partitioning
+The 'block' method partitions data according to the latitude and longitude lines that divide the occurrence localities into four bins of (insofar as possible) equal numbers (Fig. 1b). Both occurrence and background localities are assigned to each of the four bins based on their position with respect to these lines.  the block method may be desirable for studies involving model transfer across space or time, including the possibility of encountering non-analog conditions (e.g. native versus invaded regions, climate change effects; Wenger & Olden 2012).
+```{r blocks}
+library(ENMeval)
+
+blocks <- get.block(B.mon_pts, bg)
+str(blocks)
+
+
+plot(template, xlim=c(-11, 2), ylim=c(48, 59), col='gray', legend=FALSE)
+points(B.mon_pts, pch=21, bg=blocks$occ.grp)
+
+```
+
+## Variable Selection
+Before exploring which feature classes and betamultiplier are the most suitbale, the most important variables need to be selected. Including a large amount of variables with low contibutions can increase the risk of an overfitting model which can cause issues for transferabilty. 
+To avoid this, an intial run of ENMevaluate will be conducted to identify variables which contribute over 5% to the model. These will be extracted and used for 
+
+
+```{r Variable Selection setup, warning=FALSE, eval=FALSE}
+library(ENMeval)
+library(dismo)
+
+bg <- read.csv("background.csv")
+occs <- read.csv("Occurrences.csv")
+envfiles <- list.files("variables/", pattern='asc',full.names=TRUE)
+envs <- stack(envfiles)
+
+
+ENMeval_var_sel <- ENMevaluate(occ=occs, 
+                    env=envs, 
+                    bg.coords=bg, 
+                    method='block', 
+                    RMvalues=seq(1, 5, 0.5),
+                    fc=c('LQPTH'),
+                    algorithm='maxent.jar')
+```
+
+Reviewing the results of the variable selection was done via investigating the txt file 'Variableseletionprocess' produced by running the 'variableselection' function. This txt file lists the contributions of the variables used. Reviewing the 'ModelPerformance' file highlights that the AICc is lower when more variables are used and thus variables which contributed 5% or over and had a correlation value of less then 0.9 were selected to be used.
+
+```{r Variable selection ENMeval}
+ENMeval_var_sel@results[which(ENMeval_var_sel@results$delta.AICc==0),]
+
+
+aic.opt_var_sel <- ENMeval_var_sel@models[[6]]
+var.importance(aic.opt_var_sel)
+df_var_sel <- var.importance(aic.opt_var_sel)
+df_var_5 <- subset(df_var_sel, df_var_sel$percent.contribution > 5)
+print(df_var_5)
+```
+
+
+The five variables that met this criteria were:
+Bio4 - Temperature Seasonality (standard deviation *100)
+BIO9 - Mean Temperature of Driest Quarter
+Prec8 - Precipitation in Aug
+Prec9 - Precipitation in Sep
+Tmax - Maximum temperature in Mar.
+```{r variables to be used, warning=FALSE, eval=FALSE}
+
+var_sel <- read.delim("Variable_Selection/VariableSelectionProcess.txt")
+var_sel <- var_sel[3:69,1:2]
+vars <- subset(var_sel, var_sel$Contributions > 5)
+vars <- vars[,1]
+
+dir.create("Selected_Variables")
+print(vars)
+
+var1 <- raster("variables/bio4.asc")
+var2 <- raster("variables/bio9.asc")
+var3 <- raster("variables/prec8.asc")
+var4 <- raster("variables/tmax3.asc")
+
+writeRaster(var1, filename="Selected_Variables/bio4.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(var2, filename="Selected_Variables/bio9.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(var3, filename="Selected_Variables/prec8.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+writeRaster(var4, filename="Selected_Variables/tmax3.asc", format = "ascii", datatype='INT4S', overwrite=TRUE)
+```
+
+
+# Model Selection
+
+## Model Creation
+Due to memory issues the analysis for the optimal betamultiplier and feature classes has be to analysed in three parts. The best model will be selected by the lowest AICc.
+Only running with Threshold features is not possible and is thus not conducted.
+### Set 1 
+Set 1 = 'P','PT','Q','QT','QP','QPT','L','LT','LP','LPT','LQ','LQT','LQP','LQPT'
+```{r dismo enmeval set1}
+library(ENMeval)
+library(dismo)
+
+bg <- read.csv("background.csv")
+occs <- read.csv("Occurrences.csv")
+envfiles <- list.files("Selected_Variables/", pattern='asc',full.names=TRUE)
+envs <- stack(envfiles)
+
+
+
+ENMeval_set1 <- ENMevaluate(occ=occs, 
+                    env=envs, 
+                    bg.coords=bg, 
+                    method='block', 
+                    RMvalues=seq(1, 5, 0.5),
+                    fc=c('P','PT','Q','QT','QP','QPT','L','LT','LP','LPT','LQ','LQT','LQP','LQPT'),
+                    algorithm='maxent.jar')
+```
+### Set 2
+Set 2 = 'H','TH','PH','PTH','QH','QTH','QPH','QPTH'
+```{r dismo enmeval set2}
+library(ENMeval)
+library(dismo)
+
+bg <- read.csv("background.csv")
+occs <- read.csv("Occurrences.csv")
+envfiles <- list.files("Selected_Variables/", pattern='asc',full.names=TRUE)
+envs <- stack(envfiles)
+
+
+ENMeval_set2<- ENMevaluate(occ=occs, 
+                    env=envs, 
+                    bg.coords=bg, 
+                    method='block', 
+                    RMvalues=seq(1, 5, 0.5),
+                    fc=c('H','TH','PH','PTH','QH','QTH','QPH','QPTH'),
+                    algorithm='maxent.jar')
+```
+### Set 3
+set3 = 'LH','LTH','LPH','LPTH','LQH','LQTH','LQPH','LQPTH'
+```{r dismo enmeval set3}
+library(ENMeval)
+library(dismo)
+
+bg <- read.csv("background.csv")
+occs <- read.csv("Occurrences.csv")
+envfiles <- list.files("Selected_Variables/", pattern='asc',full.names=TRUE)
+envs <- stack(envfiles)
+
+
+ENMeval_set3<- ENMevaluate(occ=occs, 
+                    env=envs, 
+                    bg.coords=bg, 
+                    method='block', 
+                    RMvalues=seq(1, 5, 0.5),
+                    fc=c('LH','LTH','LPH','LPTH','LQH','LQTH','LQPH','LQPTH'),
+                    algorithm='maxent.jar')
+```
+## Model Review
+
+```{r Lowest AICc}
+
+ENMeval_set1@results[which(ENMeval_set1@results$delta.AICc==0),]
+# Lowest AICc from set1 is model 13 - LQP_1 at 18883.04
+ENMeval_set2@results[which(ENMeval_set2@results$delta.AICc==0),]
+# Lowest AICc from set2 is model 53 - QH_4 at 18645.73
+ENMeval_set3@results[which(ENMeval_set3@results$delta.AICc==0),]
+# Lowest AICc from set3 is model 29 - LQH_2.5 at 18646.62	
+#Therefor the lowest AICc overall is from set2 is model 53 - QH_4 at 18645.73
+
+#The optimal model is the one with the lowest AICc between the sets.
+aic.opt <- ENMeval_set2@models[[53]]
+
+# Plot the prediction
+plot(ENMeval_set2@predictions[[53]], main="Relative occurrence rate")
+```
+
+The lowest AICc overall is from set2 is model 53 - QH_4 at 18645.73 and an average test AUC of 0.89
+```{r Results aic_opt}
+
+aic.opt <- ENMeval_set2@models[[53]]
+var.importance(aic.opt)
+df <- var.importance(aic.opt)
+barplot(df$permutation.importance, names.arg=df$variable, las=2, ylab="Permutation Importance")
+
+response(aic.opt)
+aic.opt@results
+```
+
+# Best Model & Thresholds
+
+The lowest AICc overall is from set2 is model 53 - QH_4 at 18645.73 and an average test AUC of 0.89
+Thresholds will be based on the calculated cloglog probability at the occurance points. The probabily 
+```{r best model results, eval=FALSE}
+# Pull out the spatial predictions for this 'best' model
+aic.pred <- ENMeval_set2@predictions[[53]]
+
+# Extract the predicted values for all presence points
+pred.vals <- extract(aic.pred, ENMeval_set2@occ.pts)
+
+# Find lower quartile value of presence probability at the presence points to be used as a threshold (the value of which 75% of the points are above)
+pred_quantiles <- quantile(pred.vals, 0.25)
+as.data.frame(pred_quantiles)
+Thres_75 <- pred_quantiles[1]
+Threshold_75 <- as.vector(Thres_75)
+
+# current 75%
+Cur_75 <- aic.pred > Threshold_75
+
+# Plot to visualize
+plot(aic.pred, xlim=c(-11, 2), ylim=c(48, 59), zlim=c(0,0.002), main='Continous', col=probcol(7))
+plot(Cur_75, xlim=c(-11, 2), ylim=c(48, 59), legend=FALSE,main='Presence/Absence - 75% threshold')
+```
+
+# Future Climate
+
+CCSM4 =	CC
+
+Future variables were manually downloaded from the [Worldclim] (https://www.worldclim.org/cmip5_30s) website before being loaded and cropped in the following code.
+## File Preperation
+### CC
+```{r CCSM4: Future variables, eval=FALSE}
+
+library(raster)
+
+#Best Case (26)
+#tmax3
+CC_26_tmax3_tif <- "future_variables/CCSM4/26/tif/cc26tx503.tif" #load tif
+CC_26_tmax3_ras <- raster(CC_26_tmax3_tif) #convert to raster
+UK_CC_26_tmax3 <- crop(CC_26_tmax3_ras, UK.area) #crop to uk
+writeRaster(UK_CC_26_tmax3, "future_variables/CCSM4/26/asc/tmax3.asc", format="ascii", overwrite=TRUE) #save as asc
+#prec8
+CC_26_prec8_tif <- "future_variables/CCSM4/26/tif/cc26pr508.tif" #load tif
+CC_26_prec8_ras <- raster(CC_26_prec8_tif) #convert to raster
+UK_CC_26_prec8 <- crop(CC_26_prec8_ras, UK.area) #crop to uk
+writeRaster(UK_CC_26_prec8, "future_variables/CCSM4/26/asc/prec8.asc", format="ascii", overwrite=TRUE) #save as asc
+#bio4
+CC_26_bio4_tif <- "future_variables/CCSM4/26/tif/cc26bi504.tif" #load tif
+CC_26_bio4_ras <- raster(CC_26_bio4_tif) #convert to raster
+UK_CC_26_bio4 <- crop(CC_26_bio4_ras, UK.area) #crop to uk
+writeRaster(UK_CC_26_bio4, "future_variables/CCSM4/26/asc/bio4.asc", format="ascii", overwrite=TRUE) #save as asc
+#bio9
+CC_26_bio9_tif <- "future_variables/CCSM4/26/tif/cc26bi509.tif" #load tif
+CC_26_bio9_ras <- raster(CC_26_bio9_tif) #convert to raster
+UK_CC_26_bio9 <- crop(CC_26_bio9_ras, UK.area) #crop to uk
+writeRaster(UK_CC_26_bio9, "future_variables/CCSM4/26/asc/bio9.asc", format="ascii", overwrite=TRUE) #save as asc
+
+#Worest Case (85)
+#tmax3
+CC_85_tmax3_tif <- "future_variables/CCSM4/85/tif/cc85tx503.tif" #load tif
+CC_85_tmax3_ras <- raster(CC_85_tmax3_tif) #convert to raster
+UK_CC_85_tmax3 <- crop(CC_85_tmax3_ras, UK.area) #crop to uk
+writeRaster(UK_CC_85_tmax3, "future_variables/CCSM4/85/asc/tmax3.asc", format="ascii", overwrite=TRUE) #save as asc
+#prec8
+CC_85_prec8_tif <- "future_variables/CCSM4/85/tif/cc85pr508.tif" #load tif
+CC_85_prec8_ras <- raster(CC_85_prec8_tif) #convert to raster
+UK_CC_85_prec8 <- crop(CC_85_prec8_ras, UK.area) #crop to uk
+writeRaster(UK_CC_85_prec8, "future_variables/CCSM4/85/asc/prec8.asc", format="ascii", overwrite=TRUE) #save as asc
+#bio4
+CC_85_bio4_tif <- "future_variables/CCSM4/85/tif/cc85bi504.tif" #load tif
+CC_85_bio4_ras <- raster(CC_85_bio4_tif) #convert to raster
+UK_CC_85_bio4 <- crop(CC_85_bio4_ras, UK.area) #crop to uk
+writeRaster(UK_CC_85_bio4, "future_variables/CCSM4/85/asc/bio4.asc", format="ascii", overwrite=TRUE) #save as asc
+#bio9
+CC_85_bio9_tif <- "future_variables/CCSM4/85/tif/cc85bi509.tif" #load tif
+CC_85_bio9_ras <- raster(CC_85_bio9_tif) #convert to raster
+UK_CC_85_bio9 <- crop(CC_85_bio9_ras, UK.area) #crop to uk
+writeRaster(UK_CC_85_bio9, "future_variables/CCSM4/85/asc/bio9.asc", format="ascii", overwrite=TRUE) #save as asc
+```
+
+###MC
+
+```{r MIROC5: Future variables, eval=FALSE, include=FALSE}
+
+library(raster)
+
+#Best Case (26)
+#tmax3
+MC_26_tmax3_tif <- "future_variables/MIROC5/26/tif/mc26tx503.tif" #load tif
+MC_26_tmax3_ras <- raster(MC_26_tmax3_tif) #convert to raster
+UK_MC_26_tmax3 <- crop(MC_26_tmax3_ras, UK.area) #crop to uk
+writeRaster(UK_MC_26_tmax3, "future_variables/MIROC5/26/asc/tmax3.asc", format="ascii", overwrite=TRUE) #save as asc
+#prec8
+MC_26_prec8_tif <- "future_variables/MIROC5/26/tif/mc26pr508.tif" #load tif
+MC_26_prec8_ras <- raster(MC_26_prec8_tif) #convert to raster
+UK_MC_26_prec8 <- crop(MC_26_prec8_ras, UK.area) #crop to uk
+writeRaster(UK_MC_26_prec8, "future_variables/MIROC5/26/asc/prec8.asc", format="ascii", overwrite=TRUE) #save as asc
+#bio4
+MC_26_bio4_tif <- "future_variables/MIROC5/26/tif/mc26bi504.tif" #load tif
+MC_26_bio4_ras <- raster(MC_26_bio4_tif) #convert to raster
+UK_MC_26_bio4 <- crop(MC_26_bio4_ras, UK.area) #crop to uk
+writeRaster(UK_MC_26_bio4, "future_variables/MIROC5/26/asc/bio4.asc", format="ascii", overwrite=TRUE) #save as asc
+#bio9
+MC_26_bio9_tif <- "future_variables/MIROC5/26/tif/mc26bi509.tif" #load tif
+MC_26_bio9_ras <- raster(MC_26_bio9_tif) #convert to raster
+UK_MC_26_bio9 <- crop(MC_26_bio9_ras, UK.area) #crop to uk
+writeRaster(UK_MC_26_bio9, "future_variables/MIROC5/26/asc/bio9.asc", format="ascii", overwrite=TRUE) #save as asc
+
+#Worest Case (85)
+#tmax3
+MC_85_tmax3_tif <- "future_variables/MIROC5/85/tif/mc85tx503.tif" #load tif
+MC_85_tmax3_ras <- raster(MC_85_tmax3_tif) #convert to raster
+UK_MC_85_tmax3 <- crop(MC_85_tmax3_ras, UK.area) #crop to uk
+writeRaster(UK_MC_85_tmax3, "future_variables/MIROC5/85/asc/tmax3.asc", format="ascii", overwrite=TRUE) #save as asc
+#prec8
+MC_85_prec8_tif <- "future_variables/MIROC5/85/tif/mc85pr508.tif" #load tif
+MC_85_prec8_ras <- raster(MC_85_prec8_tif) #convert to raster
+UK_MC_85_prec8 <- crop(MC_85_prec8_ras, UK.area) #crop to uk
+writeRaster(UK_MC_85_prec8, "future_variables/MIROC5/85/asc/prec8.asc", format="ascii", overwrite=TRUE) #save as asc
+#bio4
+MC_85_bio4_tif <- "future_variables/MIROC5/85/tif/mc85bi504.tif" #load tif
+MC_85_bio4_ras <- raster(MC_85_bio4_tif) #convert to raster
+UK_MC_85_bio4 <- crop(MC_85_bio4_ras, UK.area) #crop to uk
+writeRaster(UK_MC_85_bio4, "future_variables/MIROC5/85/asc/bio4.asc", format="ascii", overwrite=TRUE) #save as asc
+#bio9
+MC_85_bio9_tif <- "future_variables/MIROC5/85/tif/mc85bi509.tif" #load tif
+MC_85_bio9_ras <- raster(MC_85_bio9_tif) #convert to raster
+UK_MC_85_bio9 <- crop(MC_85_bio9_ras, UK.area) #crop to uk
+writeRaster(UK_MC_85_bio9, "future_variables/MIROC5/85/asc/bio9.asc", format="ascii", overwrite=TRUE) #save as asc
+```
+
+## Predicted Environmental Conditions
+
+```{r CC Future climate, eval=FALSE}
+
+### Note that the layers need to match exactly the layers used to fit the model
+#26
+CC_26_envfiles <- list.files("future_variables/CCSM4/26/asc", pattern='asc',full.names=TRUE)
+CC_26_envs <- stack(CC_26_envfiles)
+#85
+CC_85_envfiles <- list.files("future_variables/CCSM4/85/asc", pattern='asc',full.names=TRUE)
+CC_85_envs <- stack(CC_85_envfiles)
+
+### Visualize the current and future environmental conditions
+plot(envs, xlim=c(-11, 2), ylim=c(48, 59),col=tempcol(10))
+plot(CC_26_envs, xlim=c(-11, 2), ylim=c(48, 59), col=tempcol(10))
+plot(CC_85_envs, xlim=c(-11, 2), ylim=c(48, 59), col=tempcol(10))
+
+### Project the model to the future conditions (with raw output)
+#CC
+CC_26_future <- predict(aic.opt, CC_26_envs, args="outputformat=raw")
+CC_85_future <- predict(aic.opt, CC_85_envs, args="outputformat=raw")
+```
+
+```{r MC Future climate}
+
+### Note that the layers need to match exactly the layers used to fit the model
+#26
+MC_26_envfiles <- list.files("future_variables/MIROC5/26/asc", pattern='asc',full.names=TRUE)
+MC_26_envs <- stack(MC_26_envfiles)
+#85
+MC_85_envfiles <- list.files("future_variables/MIROC5/85/asc", pattern='asc',full.names=TRUE)
+MC_85_envs <- stack(MC_85_envfiles)
+
+### Visualize the current and future environmental conditions
+plot(envs, xlim=c(-11, 2), ylim=c(48, 59),col=tempcol(10))
+plot(MC_26_envs, xlim=c(-11, 2), ylim=c(48, 59), col=tempcol(10))
+plot(MC_85_envs, xlim=c(-11, 2), ylim=c(48, 59), col=tempcol(10))
+
+### Project the model to the future conditions (with raw output)
+#CC
+MC_26_future <- predict(aic.opt, MC_26_envs, args="outputformat=raw")
+MC_85_future <- predict(aic.opt, MC_85_envs, args="outputformat=raw")
+```
+
+# Predictions
+```{r Prediction plots, warning=FALSE}
+
+plot(aic.pred, zlim=c(0,0.002), xlim=c(-11, 2), ylim=c(48, 59), main= 'Current Presence Probability', col=probcol(7))
+plot(CC_26_future,zlim=c(0,0.002), xlim=c(-11, 2), ylim=c(48, 59), main= 'CC26 2050 Presence Probability', col=probcol(7))
+plot(CC_85_future, zlim=c(0,0.002), xlim=c(-11, 2), ylim=c(48, 59), main= 'CC85 2050 Presence Probability', col=probcol(7))
+plot(MC_26_future, zlim=c(0,0.002), xlim=c(-11, 2), ylim=c(48, 59), main= 'MC26 2050 Presence Probability', col=probcol(7))
+plot(MC_85_future, zlim=c(0,0.002), xlim=c(-11, 2), ylim=c(48, 59), main= 'MC85 2050 Presence Probability', col=probcol(7))
+
+# CC threshold setting
+CC26_P.A <- CC_26_future > Threshold_75
+CC85_P.A <- CC_85_future > Threshold_75
+# MC threshold setting
+MC26_P.A <- MC_26_future > Threshold_75
+MC85_P.A <- MC_85_future > Threshold_75
+
+# Plot to visualize
+plot(Cur_75, xlim=c(-11, 2), ylim=c(48, 59), legend=FALSE,main='Current Presence/Absence', col=Curcol(2))
+plot(CC26_P.A, xlim=c(-11, 2), ylim=c(48, 59), legend=FALSE,main='CC26 Presence/Absence', col=CC26col(3))
+plot(CC85_P.A, xlim=c(-11, 2), ylim=c(48, 59), legend=FALSE,main='CC85 Presence/Absence', col=CC85col(4))
+plot(MC26_P.A, xlim=c(-11, 2), ylim=c(48, 59), legend=FALSE,main='MC26 Presence/Absence', col=MC26col(5))
+plot(MC85_P.A, xlim=c(-11, 2), ylim=c(48, 59), legend=FALSE,main='MC85 Presence/Absence', col=MC85col(6))
+```
+
+# Comparing Current & Future
+
+## Preperation for maps
+```{r Prep for maps}
+# Using the current threshold rasta for all maps: Cur_75
+
+#CC26
+CC26_P.A[(CC26_P.A) == 1] <- 2
+CC26_r <- Cur_75 + CC26_P.A
+CC26_f <- as.factor(CC26_r)
+CC26_r.p <- rasterToPoints(CC26_f)
+CC26_df <- data.frame(CC26_r.p)
+CC26_df$layer <- as.character(CC26_df$layer)
+CC26_la <- subset(CC26_df, CC26_df$layer > 0)
+CC26_la$layer <- as.character(CC26_la$layer)
+CC26_na <- subset(CC26_df, CC26_df$layer == 0)
+CC26_na$layer <- as.character(CC26_na$layer)
+
+#CC85
+CC85_P.A[(CC85_P.A) == 1] <- 2
+CC85_r <- Cur_75 + CC85_P.A
+CC85_f <- as.factor(CC85_r)
+CC85_r.p <- rasterToPoints(CC85_f)
+CC85_df <- data.frame(CC85_r.p)
+CC85_df$layer <- as.character(CC85_df$layer)
+CC85_la <- subset(CC85_df, CC85_df$layer > 0)
+CC85_la$layer <- as.character(CC85_la$layer)
+CC85_na <- subset(CC85_df, CC85_df$layer == 0)
+CC85_na$layer <- as.character(CC85_na$layer)
+
+#MC26
+MC26_P.A[(MC26_P.A) == 1] <- 2
+MC26_r <- Cur_75 + MC26_P.A
+MC26_f <- as.factor(MC26_r)
+MC26_r.p <- rasterToPoints(MC26_f)
+MC26_df <- data.frame(MC26_r.p)
+MC26_df$layer <- as.character(MC26_df$layer)
+MC26_la <- subset(MC26_df, MC26_df$layer > 0)
+MC26_la$layer <- as.character(MC26_la$layer)
+MC26_na <- subset(MC26_df, MC26_df$layer == 0)
+MC26_na$layer <- as.character(MC26_na$layer)
+
+#MC85
+MC85_P.A[(MC85_P.A) == 1] <- 2
+MC85_r <- Cur_75 + MC85_P.A
+MC85_f <- as.factor(MC85_r)
+MC85_r.p <- rasterToPoints(MC85_f)
+MC85_df <- data.frame(MC85_r.p)
+MC85_df$layer <- as.character(MC85_df$layer)
+MC85_la <- subset(MC85_df, MC85_df$layer > 0)
+MC85_la$layer <- as.character(MC85_la$layer)
+MC85_na <- subset(MC85_df, MC85_df$layer == 0)
+MC85_na$layer <- as.character(MC85_na$layer)
+```
+
+
+## Map Creation
+```{r plot maps, warning=FALSE}
+#Plot 
+#CC26
+CC26_map <- ggplot() +
+  geom_tile(data = CC26_na, aes(x = x, y = y), fill = '#C0C0C0') +
+  geom_tile(data = CC26_la, aes(x = x, y = y, fill = layer))+
+   scale_fill_manual(values = newc, name = "Suitable Habitat \n State", labels = c("Loss", "Gain", "Remaining")) +
+   ylim(50, 59)+
+  labs(subtitle = "CCSM4 RCP26") +
+   theme(axis.title.x = element_blank(), 
+         axis.title.y = element_blank(), 
+         axis.text.x = element_blank(), 
+         axis.text.y = element_blank(), 
+         axis.ticks = element_blank())+
+    coord_quickmap()
+#CC85
+CC85_map <- ggplot() +
+  geom_tile(data = CC85_na, aes(x = x, y = y), fill = '#C0C0C0') +
+  geom_tile(data = CC85_la, aes(x = x, y = y, fill = layer))+
+   scale_fill_manual(values = newc, name = "Suitable Habitat \n State", labels = c("Loss", "Gain", "Remaining")) +
+   ylim(50, 59)+
+   labs(subtitle = "CCSM4 RCP85") +
+   theme(axis.title.x = element_blank(), 
+         axis.title.y = element_blank(), 
+         axis.text.x = element_blank(), 
+         axis.text.y = element_blank(), 
+         axis.ticks = element_blank())+
+    coord_quickmap()
+#MC26
+MC26_map <- ggplot() +
+  geom_tile(data = MC26_na, aes(x = x, y = y), fill = '#C0C0C0') +
+  geom_tile(data = MC26_la, aes(x = x, y = y, fill = layer))+
+   scale_fill_manual(values = newc, name = "Suitable Habitat \n State", labels = c("Loss", "Gain", "Remaining")) +
+   ylim(50, 59)+
+   labs(subtitle = "MIROC5 RCP26") +
+  theme(axis.title.x = element_blank(), 
+         axis.title.y = element_blank(), 
+         axis.text.x = element_blank(), 
+         axis.text.y = element_blank(), 
+         axis.ticks = element_blank())+
+    coord_quickmap()
+#MC85
+MC85_map <- ggplot() +
+  geom_tile(data = MC85_na, aes(x = x, y = y), fill = '#C0C0C0') +
+  geom_tile(data = MC85_la, aes(x = x, y = y, fill = layer))+
+   scale_fill_manual(values = newc, name = "Suitable Habitat \n State", labels = c("Loss", "Gain", "Remaining")) +
+   ylim(50, 59)+
+  labs(subtitle = "MIROC5 RCP85") +
+  theme(axis.title.x = element_blank(), 
+         axis.title.y = element_blank(), 
+         axis.text.x = element_blank(), 
+         axis.text.y = element_blank(), 
+         axis.ticks = element_blank())+
+    coord_quickmap()
+
+
+CC26_map
+CC85_map
+MC26_map
+MC85_map
+
+```
+
+## Habitat state calculation
+```{r Area calculations, warning=FALSE}
+
+CC26_area <-  tapply(area(CC26_r), CC26_r[], sum)
+CC26_area_df <- as.data.frame(CC26_area )
+CC26_loss <- CC26_area_df[2,]
+CC26_loss
+
+CC85_area <-  tapply(area(CC85_r), CC85_r[], sum)
+CC85_area_df <- as.data.frame(CC85_area)
+CC85_loss <- CC85_area_df[2,]
+CC85_loss
+
+MC26_area <-  tapply(area(MC26_r), MC26_r[], sum)
+MC26_area_df <- as.data.frame(MC26_area)
+MC26_loss <- MC26_area_df[2,]
+MC26_loss
+
+MC85_area <-  tapply(area(MC85_r), MC85_r[], sum)
+MC85_area_df <- as.data.frame(MC85_area)
+MC85_loss <- MC85_area_df[2,]
+MC85_loss
+
+
+MC85_remain <- MC85_area_df[4,]
+current <- MC85_loss+MC85_remain
+current
+
+```
+
